@@ -26,3 +26,7 @@ func (q *Queue) Enqueue(j job.Job) {
 func (q *Queue) Jobs() <-chan job.Job {
 	return q.jobs
 }
+
+func (q *Queue) Close() {
+	close(q.jobs)
+}

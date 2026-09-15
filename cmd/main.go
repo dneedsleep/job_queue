@@ -4,18 +4,22 @@ import (
 	"jobqueue/internal/job"
 	"jobqueue/internal/queue"
 	"jobqueue/internal/worker"
-	"time"
+	"sync"
 )
 
 func main() {
 
 	q := queue.New(10)
 
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
 	w1 := worker.CreateWorker(1, q)
 	w2 := worker.CreateWorker(2, q)
 
-	go w1.Start()
-	go w2.Start()
+	go w1.Start(&wg)
+	go w2.Start(&wg)
 
 	q.Enqueue(job.Job{
 		ID:   "1",
@@ -36,7 +40,6 @@ func main() {
 		ID:   "4",
 		Type: "test",
 	})
-
-	time.Sleep(10 * time.Second)
-
+	q.Close()
+	wg.Wait()
 }

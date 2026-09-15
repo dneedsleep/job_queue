@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"jobqueue/internal/job"
 	"jobqueue/internal/queue"
+	"sync"
 	"time"
 )
 
@@ -21,18 +22,16 @@ func CreateWorker(ID int, q *queue.Queue) *Worker {
 
 func (w *Worker) Process(j job.Job) {
 	fmt.Printf("Worker %d processing job %s\n", w.ID, j.ID)
-	time.Sleep(5 * time.Second)
-	fmt.Printf("Worker %d processed job %s\n", w.ID, j.ID)
+	time.Sleep(2 * time.Second)
+	fmt.Printf("Worker %d completed     job %s\n", w.ID, j.ID)
 }
 
-func (w *Worker) Start() {
+func (w *Worker) Start(wg *sync.WaitGroup) {
+
 	fmt.Printf("Worker %d started\n", w.ID)
 
 	for j := range w.q.Jobs() {
-		fmt.Printf("Worker %d picked Job %s\n", w.ID, j.ID)
-
-		time.Sleep(2 * time.Second)
-
-		fmt.Printf("Worker %d completed Job %s \n", w.ID, j.ID)
+		w.Process(j)
 	}
+	wg.Done()
 }
