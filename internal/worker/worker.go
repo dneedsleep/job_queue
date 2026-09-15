@@ -1,9 +1,11 @@
 package worker
 
 import (
+	"errors"
 	"fmt"
 	"jobqueue/internal/job"
 	"jobqueue/internal/queue"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -20,18 +22,33 @@ func CreateWorker(ID int, q *queue.Queue) *Worker {
 	}
 }
 
-func (w *Worker) Process(j job.Job) {
+func (w *Worker) Execute(j *job.Job) error {
 	fmt.Printf("Worker %d processing job %s\n", w.ID, j.ID)
-	time.Sleep(2 * time.Second)
-	fmt.Printf("Worker %d completed     job %s\n", w.ID, j.ID)
+	j.Status = job.Processing
+	Time := time.Duration(rand.Intn(10)+1) * time.Second
+	time.Sleep(Time)
+	if Time >= 7*time.Second {
+		j.Status = job.Failed
+		return errors.New("Time taking to long")
+	}
+
+	j.Status = job.Completed
+	return nil
 }
 
 func (w *Worker) Start(wg *sync.WaitGroup) {
 
+	defer wg.Done()
+
 	fmt.Printf("Worker %d started\n", w.ID)
 
 	for j := range w.q.Jobs() {
-		w.Process(j)
+		err := w.Execute(j)
+		if err != nil {
+			fmt.Printf("Worker %d failed to complete     job %s\n", w.ID, j.ID)
+		} else {
+			fmt.Printf("Worker %d completed     job %s\n", w.ID, j.ID)
+
+		}
 	}
-	wg.Done()
 }

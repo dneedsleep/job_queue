@@ -21,24 +21,28 @@ func main() {
 	go w1.Start(&wg)
 	go w2.Start(&wg)
 
-	q.Enqueue(job.Job{
-		ID:   "1",
-		Type: "test",
+	q.Enqueue(&job.Job{
+		ID:     "1",
+		Type:   "test",
+		Status: job.Pending,
 	})
 
-	q.Enqueue(job.Job{
-		ID:   "2",
-		Type: "test",
+	q.Enqueue(&job.Job{
+		ID:     "2",
+		Type:   "test",
+		Status: job.Pending,
 	})
 
-	q.Enqueue(job.Job{
-		ID:   "3",
-		Type: "test",
+	q.Enqueue(&job.Job{
+		ID:     "3",
+		Type:   "test",
+		Status: job.Pending,
 	})
 
-	q.Enqueue(job.Job{
-		ID:   "4",
-		Type: "test",
+	q.Enqueue(&job.Job{
+		ID:     "4",
+		Type:   "test",
+		Status: job.Pending,
 	})
 	q.Close()
 	wg.Wait()
