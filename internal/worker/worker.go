@@ -24,15 +24,21 @@ func CreateWorker(ID int, q *queue.Queue) *Worker {
 
 func (w *Worker) Execute(j *job.Job) error {
 	fmt.Printf("Worker %d processing job %s\n", w.ID, j.ID)
-	j.Status = job.Processing
+	if err := j.StatusUpdate(job.Processing); err != nil {
+		return err
+	}
 	Time := time.Duration(rand.Intn(10)+1) * time.Second
 	time.Sleep(Time)
 	if Time >= 7*time.Second {
-		j.Status = job.Failed
+		if err := j.StatusUpdate(job.Failed); err != nil {
+			return err
+		}
 		return errors.New("Time taking to long")
 	}
 
-	j.Status = job.Completed
+	if err := j.StatusUpdate(job.Completed); err != nil {
+		return err
+	}
 	return nil
 }
 
