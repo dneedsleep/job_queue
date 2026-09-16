@@ -42,7 +42,7 @@ func (w *Worker) Execute(j *job.Job) error {
 	return nil
 }
 
-func (w *Worker) Start(wg *sync.WaitGroup) {
+func (w *Worker) Start(wg, jobwg *sync.WaitGroup) {
 
 	defer wg.Done()
 
@@ -52,9 +52,29 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 		err := w.Execute(j)
 		if err != nil {
 			fmt.Printf("Worker %d failed to complete     job %s\n", w.ID, j.ID)
-		} else {
-			fmt.Printf("Worker %d completed     job %s\n", w.ID, j.ID)
+			j.RetryCount++
+			if j.RetryCount <= j.MaxRetries {
+				fmt.Printf(
+					"Job %s failed. Retry count: %d\n",
+					j.ID,
+					j.RetryCount,
+				)
+				j.StatusUpdate(job.Pending)
+				w.q.Enqueue(j)
+				continue
+			}
+
+			fmt.Printf(
+				"Job %s permanently failed after %d retries\n",
+				j.ID,
+				j.RetryCount,
+			)
+			jobwg.Done()
+			continue
 
 		}
+		fmt.Printf("Worker %d completed     job %s\n", w.ID, j.ID)
+		jobwg.Done()
+
 	}
 }
