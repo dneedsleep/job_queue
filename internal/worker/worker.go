@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"jobqueue/internal/job"
 	"jobqueue/internal/queue"
@@ -11,29 +11,36 @@ import (
 )
 
 type Worker struct {
-	ID int
-	q  *queue.Queue
+	ID       int
+	q        *queue.Queue
+	registry *HandlerRegistry
 }
 
-func CreateWorker(ID int, q *queue.Queue) *Worker {
+func CreateWorker(ID int, q *queue.Queue, registry *HandlerRegistry) *Worker {
 	return &Worker{
-		ID: ID,
-		q:  q,
+		ID:       ID,
+		q:        q,
+		registry: registry,
 	}
 }
 
-func (w *Worker) Execute(j *job.Job) error {
+func (w *Worker) Execute(prtctx context.Context, j *job.Job) error {
+
+	ctx, cancel := context.WithTimeout(prtctx, 5*time.Second)
+
+	defer cancel()
+
 	fmt.Printf("Worker %d processing job %s\n", w.ID, j.ID)
 	if err := j.StatusUpdate(job.Processing); err != nil {
 		return err
 	}
-	Time := time.Duration(rand.Intn(10)+1) * time.Second
-	time.Sleep(Time)
-	if Time >= 7*time.Second {
-		if err := j.StatusUpdate(job.Failed); err != nil {
-			return err
-		}
-		return errors.New("Time taking to long")
+	executionTime := time.Duration(rand.Intn(10)+1) * time.Second
+	select {
+	case <-time.After(executionTime):
+		// simulated work finished
+
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 
 	if err := j.StatusUpdate(job.Completed); err != nil {
@@ -42,25 +49,46 @@ func (w *Worker) Execute(j *job.Job) error {
 	return nil
 }
 
-func (w *Worker) Start(wg, jobwg *sync.WaitGroup) {
+func (w *Worker) Start(ctx context.Context, wg, jobwg *sync.WaitGroup) {
 
 	defer wg.Done()
 
 	fmt.Printf("Worker %d started\n", w.ID)
 
 	for j := range w.q.Jobs() {
-		err := w.Execute(j)
+
+		handler, ok := w.registry.Get(j.Type)
+
+		if !ok {
+			fmt.Printf("No handler found for job type: %s\n", j.Type)
+			// handle failure/retry here later
+			continue
+		}
+
+		err := handler.Handle(ctx, j)
+
+		// old logic
+		//err := w.Execute(ctx, j)
 		if err != nil {
 			fmt.Printf("Worker %d failed to complete     job %s\n", w.ID, j.ID)
 			j.RetryCount++
+
 			if j.RetryCount <= j.MaxRetries {
+
+				delay := time.Duration(j.RetryCount) * time.Second
+
 				fmt.Printf(
 					"Job %s failed. Retry count: %d\n",
 					j.ID,
 					j.RetryCount,
 				)
+
 				j.StatusUpdate(job.Pending)
-				w.q.Enqueue(j)
+
+				// time AFERER func function fires a go rountine that it will be implement after this much time
+				time.AfterFunc(delay, func() {
+					w.q.Enqueue(j)
+				})
 				continue
 			}
 

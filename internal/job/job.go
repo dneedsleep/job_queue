@@ -17,7 +17,7 @@ const (
 type Job struct {
 	ID         string
 	Type       string
-	Payload    string
+	Payload    any
 	Status     Status
 	RetryCount int
 	MaxRetries int
