@@ -22,44 +22,34 @@ func main() {
 	var wg sync.WaitGroup
 	var jobWg sync.WaitGroup
 
-	jobWg.Add(4)
-	wg.Add(2)
+	jobWg.Add(1)
+	wg.Add(1)
 
 	ctx := context.Background()
 
 	w1 := worker.CreateWorker(1, q, registry)
-	w2 := worker.CreateWorker(2, q, registry)
+	//w2 := worker.CreateWorker(2, q, registry)
 
 	go w1.Start(ctx, &wg, &jobWg)
-	go w2.Start(ctx, &wg, &jobWg)
+	//go w2.Start(ctx, &wg, &jobWg)
 
-	q.Enqueue(&job.Job{
+	videoPayload := job.VideoPayload{
+		Operation:  "resize",
+		InputPath:  "videos/input.mp4",
+		OutputPath: "videos/output.mp4",
+		Width:      1280,
+		Height:     720,
+	}
+
+	videoJob := &job.Job{
 		ID:         "1",
 		Type:       "video",
+		Payload:    videoPayload,
 		Status:     job.Pending,
-		MaxRetries: 2,
-	})
+		MaxRetries: 3,
+	}
 
-	q.Enqueue(&job.Job{
-		ID:         "2",
-		Type:       "video",
-		Status:     job.Pending,
-		MaxRetries: 2,
-	})
-
-	q.Enqueue(&job.Job{
-		ID:         "3",
-		Type:       "video",
-		Status:     job.Pending,
-		MaxRetries: 2,
-	})
-
-	q.Enqueue(&job.Job{
-		ID:         "4",
-		Type:       "video",
-		Status:     job.Pending,
-		MaxRetries: 2,
-	})
+	q.Enqueue(videoJob)
 	//q.Close()
 	jobWg.Wait()
 	q.Close()

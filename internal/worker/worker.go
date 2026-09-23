@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"jobqueue/internal/job"
 	"jobqueue/internal/queue"
-	"math/rand"
 	"sync"
 	"time"
 )
@@ -24,31 +23,6 @@ func CreateWorker(ID int, q *queue.Queue, registry *HandlerRegistry) *Worker {
 	}
 }
 
-func (w *Worker) Execute(prtctx context.Context, j *job.Job) error {
-
-	ctx, cancel := context.WithTimeout(prtctx, 5*time.Second)
-
-	defer cancel()
-
-	fmt.Printf("Worker %d processing job %s\n", w.ID, j.ID)
-	if err := j.StatusUpdate(job.Processing); err != nil {
-		return err
-	}
-	executionTime := time.Duration(rand.Intn(10)+1) * time.Second
-	select {
-	case <-time.After(executionTime):
-		// simulated work finished
-
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
-	if err := j.StatusUpdate(job.Completed); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (w *Worker) Start(ctx context.Context, wg, jobwg *sync.WaitGroup) {
 
 	defer wg.Done()
@@ -61,11 +35,21 @@ func (w *Worker) Start(ctx context.Context, wg, jobwg *sync.WaitGroup) {
 
 		if !ok {
 			fmt.Printf("No handler found for job type: %s\n", j.Type)
-			// handle failure/retry here later
+			j.StatusUpdate(job.Failed)
+			jobwg.Done()
 			continue
 		}
 
+		if err := j.StatusUpdate(job.Processing); err != nil {
+			fmt.Printf("Failed to update job %s to processing: %v\n", j.ID, err)
+			jobwg.Done()
+			continue
+		}
+
+		start := time.Now()
 		err := handler.Handle(ctx, j)
+
+		duration := time.Since(start)
 
 		// old logic
 		//err := w.Execute(ctx, j)
@@ -101,7 +85,7 @@ func (w *Worker) Start(ctx context.Context, wg, jobwg *sync.WaitGroup) {
 			continue
 
 		}
-		fmt.Printf("Worker %d completed     job %s\n", w.ID, j.ID)
+		fmt.Printf("Worker %d completed job , time taken %v %s\n", w.ID, duration, j.ID)
 		jobwg.Done()
 
 	}
